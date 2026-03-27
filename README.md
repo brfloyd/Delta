@@ -15,10 +15,23 @@ npm install
 npm run dev:desktop
 ```
 
-## Build desktop app
+## Build locally
 
 ```bash
-npm run build:desktop
+npm run build:mac     # macOS .dmg
+npm run build:linux   # Linux .AppImage + .deb
+npm run build:desktop # build for current platform
+```
+
+Output goes to `dist/`.
+
+## Release
+
+Push a version tag to trigger a GitHub Actions build that creates a Release with downloadable installers for macOS and Linux:
+
+```bash
+git tag v0.1.0
+git push origin v0.1.0
 ```
 
 ## Stack
