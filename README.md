@@ -1,16 +1,15 @@
-# Local Diff Viewer
+# Delta
 
-Desktop app for viewing branch diffs locally in a clean PR/MR-style layout.
+Local-first desktop app for viewing branch diffs in a clean PR/MR-style layout. No network calls, no draft merge requests -- just your local git repo.
 
 ## What it does
 
 - Select a local git repository directory.
 - Pick a working branch and target branch.
 - Render a full-page, GitHub/GitLab-like unified diff.
-- Show changed files in a left sidebar.
-- Jump to file sections by clicking filenames.
-
-No runtime network calls are made by the app. It only reads local git state.
+- Browse changed files in a sidebar with scroll-spy navigation.
+- Collapse/expand individual file diffs for focused review.
+- Refresh diffs on demand after making local changes.
 
 ## Run
 

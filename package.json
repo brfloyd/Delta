@@ -1,7 +1,7 @@
 {
-  "name": "diff_viewer",
+  "name": "delta",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Local-first desktop branch diff viewer",
   "type": "module",
   "main": "electron/main.cjs",
@@ -38,8 +38,8 @@
     "vite": "^5.4.19"
   },
   "build": {
-    "appId": "com.local.diffviewer",
-    "productName": "Local Diff Viewer",
+    "appId": "com.local.delta",
+    "productName": "Delta",
     "files": [
       "dist/**/*",
       "electron/**/*",

@@ -12,7 +12,7 @@ function createWindow() {
     minWidth: 1100,
     minHeight: 700,
     backgroundColor: "#0b1018",
-    title: "Local Diff Viewer",
+    title: "Delta",
     webPreferences: {
       preload: path.join(__dirname, "preload.cjs"),
       contextIsolation: true,
