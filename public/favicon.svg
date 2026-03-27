@@ -1,7 +1,23 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="80" fill="#0d1117"/>
-  <clipPath id="l"><rect x="56" y="56" width="200" height="400"/></clipPath>
-  <clipPath id="r"><rect x="256" y="56" width="200" height="400"/></clipPath>
-  <polygon points="256,76 456,436 56,436" fill="#3fb950" clip-path="url(#l)"/>
-  <polygon points="256,76 456,436 56,436" fill="#f85149" clip-path="url(#r)"/>
+  <defs>
+    <linearGradient id="gl" x1="0" y1="1" x2="0" y2="0">
+      <stop offset="0%" stop-color="#3fb950"/>
+      <stop offset="100%" stop-color="#6ee7a0"/>
+    </linearGradient>
+    <linearGradient id="gr" x1="0" y1="1" x2="0" y2="0">
+      <stop offset="0%" stop-color="#f85149"/>
+      <stop offset="100%" stop-color="#fca5a1"/>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="18" result="blur"/>
+      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    </filter>
+    <clipPath id="cl"><rect x="56" y="56" width="197" height="400"/></clipPath>
+    <clipPath id="cr"><rect x="259" y="56" width="197" height="400"/></clipPath>
+  </defs>
+  <rect width="512" height="512" rx="96" fill="#0d1117"/>
+  <g filter="url(#glow)">
+    <polygon points="256,80 452,432 60,432" fill="url(#gl)" clip-path="url(#cl)"/>
+    <polygon points="256,80 452,432 60,432" fill="url(#gr)" clip-path="url(#cr)"/>
+  </g>
 </svg>

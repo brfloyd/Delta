@@ -231,10 +231,14 @@ function App() {
       <header className="topbar">
         <div className="tb-left">
           <svg className="logo-mark" width="18" height="18" viewBox="0 0 512 512">
-            <clipPath id="dl"><rect x="56" y="56" width="200" height="400" /></clipPath>
-            <clipPath id="dr"><rect x="256" y="56" width="200" height="400" /></clipPath>
-            <polygon points="256,76 456,436 56,436" fill="#3fb950" clipPath="url(#dl)" />
-            <polygon points="256,76 456,436 56,436" fill="#f85149" clipPath="url(#dr)" />
+            <defs>
+              <linearGradient id="tgl" x1="0" y1="1" x2="0" y2="0"><stop offset="0%" stopColor="#3fb950" /><stop offset="100%" stopColor="#6ee7a0" /></linearGradient>
+              <linearGradient id="tgr" x1="0" y1="1" x2="0" y2="0"><stop offset="0%" stopColor="#f85149" /><stop offset="100%" stopColor="#fca5a1" /></linearGradient>
+              <clipPath id="dl"><rect x="56" y="56" width="197" height="400" /></clipPath>
+              <clipPath id="dr"><rect x="259" y="56" width="197" height="400" /></clipPath>
+            </defs>
+            <polygon points="256,80 452,432 60,432" fill="url(#tgl)" clipPath="url(#dl)" />
+            <polygon points="256,80 452,432 60,432" fill="url(#tgr)" clipPath="url(#dr)" />
           </svg>
           <span className="app-name">Delta</span>
         </div>
@@ -304,11 +308,15 @@ function App() {
         <div className="diff-pane" ref={diffRef}>
           {files.length === 0 ? (
             <div className="empty">
-              <svg width="56" height="56" viewBox="0 0 512 512" opacity=".25">
-                <clipPath id="el"><rect x="56" y="56" width="200" height="400" /></clipPath>
-                <clipPath id="er"><rect x="256" y="56" width="200" height="400" /></clipPath>
-                <polygon points="256,76 456,436 56,436" fill="#3fb950" clipPath="url(#el)" />
-                <polygon points="256,76 456,436 56,436" fill="#f85149" clipPath="url(#er)" />
+              <svg width="56" height="56" viewBox="0 0 512 512" opacity=".3">
+                <defs>
+                  <linearGradient id="egl" x1="0" y1="1" x2="0" y2="0"><stop offset="0%" stopColor="#3fb950" /><stop offset="100%" stopColor="#6ee7a0" /></linearGradient>
+                  <linearGradient id="egr" x1="0" y1="1" x2="0" y2="0"><stop offset="0%" stopColor="#f85149" /><stop offset="100%" stopColor="#fca5a1" /></linearGradient>
+                  <clipPath id="el"><rect x="56" y="56" width="197" height="400" /></clipPath>
+                  <clipPath id="er"><rect x="259" y="56" width="197" height="400" /></clipPath>
+                </defs>
+                <polygon points="256,80 452,432 60,432" fill="url(#egl)" clipPath="url(#el)" />
+                <polygon points="256,80 452,432 60,432" fill="url(#egr)" clipPath="url(#er)" />
               </svg>
               <p>
                 {hasCompared
