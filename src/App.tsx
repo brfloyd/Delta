@@ -1,4 +1,89 @@
+import hljs from "highlight.js/lib/core";
+import bash from "highlight.js/lib/languages/bash";
+import c from "highlight.js/lib/languages/c";
+import cpp from "highlight.js/lib/languages/cpp";
+import csharp from "highlight.js/lib/languages/csharp";
+import css from "highlight.js/lib/languages/css";
+import diff from "highlight.js/lib/languages/diff";
+import go from "highlight.js/lib/languages/go";
+import graphql from "highlight.js/lib/languages/graphql";
+import java from "highlight.js/lib/languages/java";
+import javascript from "highlight.js/lib/languages/javascript";
+import json from "highlight.js/lib/languages/json";
+import kotlin from "highlight.js/lib/languages/kotlin";
+import lua from "highlight.js/lib/languages/lua";
+import markdown from "highlight.js/lib/languages/markdown";
+import php from "highlight.js/lib/languages/php";
+import python from "highlight.js/lib/languages/python";
+import ruby from "highlight.js/lib/languages/ruby";
+import rust from "highlight.js/lib/languages/rust";
+import scss from "highlight.js/lib/languages/scss";
+import shell from "highlight.js/lib/languages/shell";
+import sql from "highlight.js/lib/languages/sql";
+import swift from "highlight.js/lib/languages/swift";
+import typescript from "highlight.js/lib/languages/typescript";
+import xml from "highlight.js/lib/languages/xml";
+import yaml from "highlight.js/lib/languages/yaml";
 import { memo, useEffect, useMemo, useRef, useState } from "react";
+
+hljs.registerLanguage("bash", bash);
+hljs.registerLanguage("c", c);
+hljs.registerLanguage("cpp", cpp);
+hljs.registerLanguage("csharp", csharp);
+hljs.registerLanguage("css", css);
+hljs.registerLanguage("diff", diff);
+hljs.registerLanguage("go", go);
+hljs.registerLanguage("graphql", graphql);
+hljs.registerLanguage("java", java);
+hljs.registerLanguage("javascript", javascript);
+hljs.registerLanguage("json", json);
+hljs.registerLanguage("kotlin", kotlin);
+hljs.registerLanguage("lua", lua);
+hljs.registerLanguage("markdown", markdown);
+hljs.registerLanguage("php", php);
+hljs.registerLanguage("python", python);
+hljs.registerLanguage("ruby", ruby);
+hljs.registerLanguage("rust", rust);
+hljs.registerLanguage("scss", scss);
+hljs.registerLanguage("shell", shell);
+hljs.registerLanguage("sql", sql);
+hljs.registerLanguage("swift", swift);
+hljs.registerLanguage("typescript", typescript);
+hljs.registerLanguage("xml", xml);
+hljs.registerLanguage("yaml", yaml);
+
+const EXT_TO_LANG: Record<string, string> = {
+  ".js": "javascript", ".mjs": "javascript", ".cjs": "javascript", ".jsx": "javascript",
+  ".ts": "typescript", ".tsx": "typescript", ".mts": "typescript", ".cts": "typescript",
+  ".py": "python", ".pyw": "python",
+  ".rb": "ruby", ".rake": "ruby",
+  ".rs": "rust",
+  ".go": "go",
+  ".java": "java",
+  ".kt": "kotlin", ".kts": "kotlin",
+  ".swift": "swift",
+  ".c": "c", ".h": "c",
+  ".cpp": "cpp", ".cc": "cpp", ".cxx": "cpp", ".hpp": "cpp",
+  ".cs": "csharp",
+  ".php": "php",
+  ".lua": "lua",
+  ".sql": "sql",
+  ".sh": "bash", ".bash": "bash", ".zsh": "bash",
+  ".css": "css",
+  ".scss": "scss", ".sass": "scss",
+  ".html": "xml", ".htm": "xml", ".xml": "xml", ".svg": "xml",
+  ".json": "json",
+  ".yaml": "yaml", ".yml": "yaml",
+  ".md": "markdown", ".mdx": "markdown",
+  ".graphql": "graphql", ".gql": "graphql",
+  ".diff": "diff", ".patch": "diff",
+};
+
+const detectLang = (filename: string): string => {
+  const dot = filename.lastIndexOf(".");
+  if (dot === -1) return "plaintext";
+  return EXT_TO_LANG[filename.slice(dot).toLowerCase()] || "plaintext";
+};
 
 type DiffChange = {
   type: "add" | "del" | "normal";
@@ -56,24 +141,37 @@ const StatBar = memo(function StatBar({ a, d }: { a: number; d: number }) {
   );
 });
 
-const DiffLine = memo(function DiffLine({ change }: { change: DiffChange }) {
+const DiffLine = memo(function DiffLine({ change, lang }: { change: DiffChange; lang: string }) {
   const oldLn = change.type === "del" ? change.ln : change.type === "normal" ? change.ln1 : "";
   const newLn = change.type === "add" ? change.ln : change.type === "normal" ? change.ln2 : "";
+  const raw = change.content.slice(1) || " ";
+  const highlighted = useMemo(() => {
+    if (lang === "plaintext" || !raw.trim()) return null;
+    try {
+      return hljs.highlight(raw, { language: lang }).value;
+    } catch {
+      return null;
+    }
+  }, [raw, lang]);
+
   return (
     <div className={`ln-row ${change.type}`}>
       <span className="gutter old">{oldLn ?? ""}</span>
       <span className="gutter new">{newLn ?? ""}</span>
       <span className="pfx">{change.type === "add" ? "+" : change.type === "del" ? "-" : " "}</span>
-      <code>{change.content.slice(1) || " "}</code>
+      {highlighted
+        ? <code dangerouslySetInnerHTML={{ __html: highlighted }} />
+        : <code>{raw}</code>
+      }
     </div>
   );
 });
 
-const Chunk = memo(function Chunk({ chunk, fk }: { chunk: DiffChunk; fk: string }) {
+const Chunk = memo(function Chunk({ chunk, fk, lang }: { chunk: DiffChunk; fk: string; lang: string }) {
   return (
     <div className="chunk">
       <div className="chunk-hd">{chunk.content}</div>
-      {chunk.changes.map((c, i) => <DiffLine key={`${fk}-${i}`} change={c} />)}
+      {chunk.changes.map((c, i) => <DiffLine key={`${fk}-${i}`} change={c} lang={lang} />)}
     </div>
   );
 });
@@ -82,6 +180,7 @@ const FileDiff = memo(function FileDiff({ file }: { file: DiffFile }) {
   const [open, setOpen] = useState(true);
   const label = fileLabel(file);
   const st = fileStatus(file);
+  const lang = useMemo(() => detectLang(label), [label]);
 
   return (
     <article className="file-card" data-file={label}>
@@ -100,7 +199,7 @@ const FileDiff = memo(function FileDiff({ file }: { file: DiffFile }) {
       {open && (
         <div className="diff-body">
           {file.chunks.map((chunk, i) => (
-            <Chunk key={`${label}-c${i}`} chunk={chunk} fk={`${label}-c${i}`} />
+            <Chunk key={`${label}-c${i}`} chunk={chunk} fk={`${label}-c${i}`} lang={lang} />
           ))}
         </div>
       )}
