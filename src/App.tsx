@@ -237,7 +237,15 @@ const FileItem = memo(function FileItem({
   );
 });
 
-function App() {
+type Tab = { id: string };
+
+const DiffTabContent = memo(function DiffTabContent({
+  active,
+  onRepoChange,
+}: {
+  active: boolean;
+  onRepoChange: (name: string) => void;
+}) {
   const [repoPath, setRepoPath] = useState("");
   const [branches, setBranches] = useState<string[]>([]);
   const [workingBranch, setWorkingBranch] = useState("");
@@ -263,6 +271,7 @@ function App() {
   );
 
   useEffect(() => {
+    if (!active) return;
     const pane = diffRef.current;
     if (!pane || files.length === 0) return;
 
@@ -281,13 +290,14 @@ function App() {
     const cards = pane.querySelectorAll<HTMLElement>(".file-card");
     cards.forEach((el) => observer.observe(el));
     return () => observer.disconnect();
-  }, [files]);
+  }, [files, active]);
 
   const selectRepo = async () => {
     setError("");
     const p = await window.diffViewerAPI.selectRepository();
     if (!p) return;
     setRepoPath(p);
+    onRepoChange(p.split("/").pop() || p);
     setHasCompared(false);
     setLoading(true);
     try {
@@ -326,49 +336,41 @@ function App() {
   const repoName = repoPath ? repoPath.split("/").pop() : null;
 
   return (
-    <div className="shell">
-      <header className="topbar">
-        <div className="tb-left">
-          <svg className="logo-mark" width="24" height="24" viewBox="0 0 24 24">
-            <polygon points="12,2 1,22 10.5,22" fill="#3fb950" />
-            <polygon points="12,2 23,22 13.5,22" fill="#f85149" />
-          </svg>
-          <span className="app-name">Delta</span>
-        </div>
-        <div className="tb-right">
-          {repoName && <span className="repo-pill">{repoName}</span>}
-          <button className="btn ghost" onClick={selectRepo}>
-            {repoPath ? "Change repo" : "Open Repository"}
-          </button>
-        </div>
-      </header>
-
-      {repoPath && (
-        <section className="ctrl">
-          <div className="br-row">
-            <div className="br-pair">
-              <label>
-                <span className="lbl">base</span>
-                <select value={targetBranch} onChange={(e) => setTargetBranch(e.target.value)}>
-                  <option value="">select&hellip;</option>
-                  {branches.map((b) => <option key={b} value={b}>{b}</option>)}
-                </select>
-              </label>
-              <span className="arrow">&larr;</span>
-              <label>
-                <span className="lbl">compare</span>
-                <select value={workingBranch} onChange={(e) => setWorkingBranch(e.target.value)}>
-                  <option value="">select&hellip;</option>
-                  {branches.map((b) => <option key={b} value={b}>{b}</option>)}
-                </select>
-              </label>
-            </div>
-            <button className="btn accent" onClick={runDiff} disabled={!workingBranch || !targetBranch || loading}>
-              {loading ? <span className="spin" /> : "Compare"}
+    <div className={`tab-content${active ? " active" : ""}`}>
+      <section className="ctrl">
+        <div className="br-row">
+          <div className="br-row-left">
+            {repoName && <span className="repo-pill">{repoName}</span>}
+            <button className="btn ghost" onClick={selectRepo}>
+              {repoPath ? "Change repo" : "Open Repository"}
             </button>
           </div>
-        </section>
-      )}
+          {repoPath && (
+            <>
+              <div className="br-pair">
+                <label>
+                  <span className="lbl">base</span>
+                  <select value={targetBranch} onChange={(e) => setTargetBranch(e.target.value)}>
+                    <option value="">select&hellip;</option>
+                    {branches.map((b) => <option key={b} value={b}>{b}</option>)}
+                  </select>
+                </label>
+                <span className="arrow">&larr;</span>
+                <label>
+                  <span className="lbl">compare</span>
+                  <select value={workingBranch} onChange={(e) => setWorkingBranch(e.target.value)}>
+                    <option value="">select&hellip;</option>
+                    {branches.map((b) => <option key={b} value={b}>{b}</option>)}
+                  </select>
+                </label>
+              </div>
+              <button className="btn accent" onClick={runDiff} disabled={!workingBranch || !targetBranch || loading}>
+                {loading ? <span className="spin" /> : "Compare"}
+              </button>
+            </>
+          )}
+        </div>
+      </section>
 
       {error && <div className="err">{error}</div>}
 
@@ -434,6 +436,83 @@ function App() {
             </>
           )}
         </div>
+      </div>
+    </div>
+  );
+});
+
+const makeTab = (): Tab => ({ id: crypto.randomUUID() });
+
+function App() {
+  const [tabs, setTabs] = useState<Tab[]>(() => [makeTab()]);
+  const [activeTabId, setActiveTabId] = useState(() => tabs[0].id);
+  const [tabLabels, setTabLabels] = useState<Record<string, string>>({});
+
+  const addTab = () => {
+    const t = makeTab();
+    setTabs((prev) => [...prev, t]);
+    setActiveTabId(t.id);
+  };
+
+  const closeTab = (id: string) => {
+    if (tabs.length <= 1) return;
+    const idx = tabs.findIndex((t) => t.id === id);
+    const next = tabs.filter((t) => t.id !== id);
+    if (activeTabId === id) {
+      setActiveTabId(next[Math.min(idx, next.length - 1)].id);
+    }
+    setTabs(next);
+    setTabLabels((prev) => {
+      const copy = { ...prev };
+      delete copy[id];
+      return copy;
+    });
+  };
+
+  const updateLabel = (id: string, label: string) => {
+    setTabLabels((prev) => ({ ...prev, [id]: label }));
+  };
+
+  return (
+    <div className="shell">
+      <header className="topbar">
+        <div className="tb-left">
+          <svg className="logo-mark" width="24" height="24" viewBox="0 0 24 24">
+            <polygon points="12,2 1,22 10.5,22" fill="#3fb950" />
+            <polygon points="12,2 23,22 13.5,22" fill="#f85149" />
+          </svg>
+          <span className="app-name">Delta</span>
+        </div>
+        <div className="tab-strip">
+          {tabs.map((tab) => (
+            <button
+              key={tab.id}
+              className={`tab-btn${tab.id === activeTabId ? " active" : ""}`}
+              onClick={() => setActiveTabId(tab.id)}
+            >
+              <span className="tab-label">{tabLabels[tab.id] || "New Tab"}</span>
+              {tabs.length > 1 && (
+                <span
+                  className="tab-close"
+                  onClick={(e) => { e.stopPropagation(); closeTab(tab.id); }}
+                >
+                  &times;
+                </span>
+              )}
+            </button>
+          ))}
+          <button className="tab-add" onClick={addTab} title="New tab">+</button>
+        </div>
+      </header>
+
+      <div className="tab-content-wrapper">
+        {tabs.map((tab) => (
+          <DiffTabContent
+            key={tab.id}
+            active={tab.id === activeTabId}
+            onRepoChange={(name) => updateLabel(tab.id, name)}
+          />
+        ))}
       </div>
     </div>
   );

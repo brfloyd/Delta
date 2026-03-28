@@ -44,7 +44,7 @@ body,
 
 .shell {
   display: grid;
-  grid-template-rows: auto auto 1fr;
+  grid-template-rows: auto 1fr;
   height: 100%;
   overflow: hidden;
 }
@@ -53,10 +53,8 @@ body,
 
 .topbar {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  height: 48px;
-  padding: 0 16px;
+  align-items: stretch;
+  height: 44px;
   background: var(--bg-1);
   border-bottom: 1px solid var(--bd);
   -webkit-app-region: drag;
@@ -66,7 +64,9 @@ body,
   display: flex;
   align-items: center;
   gap: 8px;
+  padding: 0 14px;
   color: var(--t2);
+  flex-shrink: 0;
 }
 
 .app-name {
@@ -76,11 +76,120 @@ body,
   letter-spacing: -0.2px;
 }
 
-.tb-right {
+/* ===== Tab strip (inside topbar) ===== */
+
+.tab-strip {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  padding: 0 4px;
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+  -webkit-app-region: no-drag;
+}
+
+.tab-strip::-webkit-scrollbar {
+  height: 0;
+}
+
+.tab-btn {
   display: flex;
   align-items: center;
-  gap: 8px;
-  -webkit-app-region: no-drag;
+  gap: 6px;
+  height: 34px;
+  padding: 0 12px;
+  border: 1px solid transparent;
+  border-bottom: none;
+  border-radius: 8px 8px 0 0;
+  background: transparent;
+  color: var(--t2);
+  font-size: 12px;
+  font-family: var(--sans);
+  cursor: pointer;
+  flex-shrink: 0;
+  max-width: 180px;
+  transition: background 100ms, color 100ms;
+}
+
+.tab-btn:hover {
+  background: var(--bg-2);
+  color: var(--t1);
+}
+
+.tab-btn.active {
+  background: var(--bg-0);
+  color: var(--t1);
+  border-color: var(--bd);
+}
+
+.tab-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tab-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  font-size: 14px;
+  line-height: 1;
+  color: var(--t3);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.tab-close:hover {
+  background: rgba(248, 81, 73, 0.2);
+  color: var(--del-fg);
+}
+
+.tab-add {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  margin-bottom: 3px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--t3);
+  font-size: 18px;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 100ms, color 100ms;
+}
+
+.tab-add:hover {
+  background: var(--bg-2);
+  color: var(--t1);
+}
+
+/* ===== Tab content wrapper ===== */
+
+.tab-content-wrapper {
+  position: relative;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.tab-content {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.tab-content.active {
+  visibility: visible;
+  pointer-events: auto;
 }
 
 .repo-pill {
@@ -152,6 +261,12 @@ body,
   gap: 12px;
 }
 
+.br-row-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .br-pair {
   display: flex;
   align-items: flex-end;
@@ -221,6 +336,7 @@ select:focus {
 .workspace {
   display: grid;
   grid-template-columns: 260px 1fr;
+  flex: 1;
   min-height: 0;
   overflow: hidden;
 }
