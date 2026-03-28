@@ -24,7 +24,7 @@ import swift from "highlight.js/lib/languages/swift";
 import typescript from "highlight.js/lib/languages/typescript";
 import xml from "highlight.js/lib/languages/xml";
 import yaml from "highlight.js/lib/languages/yaml";
-import { memo, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 hljs.registerLanguage("bash", bash);
 hljs.registerLanguage("c", c);
@@ -364,6 +364,28 @@ const DiffTabContent = memo(function DiffTabContent({
   const [activeFile, setActiveFile] = useState("");
   const [hasCompared, setHasCompared] = useState(false);
   const diffRef = useRef<HTMLDivElement>(null);
+  const workspaceRef = useRef<HTMLDivElement>(null);
+  const [sidebarW, setSidebarW] = useState(260);
+
+  const startResize = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    const ws = workspaceRef.current;
+    if (!ws) return;
+    const rect = ws.getBoundingClientRect();
+    document.body.classList.add("resizing");
+    const onMove = (ev: MouseEvent) => {
+      const w = Math.min(rect.width * 0.5, Math.max(160, ev.clientX - rect.left));
+      setSidebarW(w);
+    };
+    const onUp = () => {
+      document.body.classList.remove("resizing");
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+    };
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+  }, []);
+
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchInput, setSearchInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
@@ -552,7 +574,7 @@ const DiffTabContent = memo(function DiffTabContent({
 
       {error && <div className="err">{error}</div>}
 
-      <div className="workspace">
+      <div className="workspace" ref={workspaceRef} style={{ gridTemplateColumns: `${sidebarW}px auto 1fr` }}>
         <aside className="sidebar">
           <div className="sb-head">
             <span>Files changed</span>
@@ -577,7 +599,7 @@ const DiffTabContent = memo(function DiffTabContent({
             )}
           </div>
         </aside>
-
+        <div className="resize-handle" onMouseDown={startResize} />
         <div className="diff-pane" ref={diffRef}>
           {searchOpen && (
             <SearchBar

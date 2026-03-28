@@ -335,10 +335,33 @@ select:focus {
 
 .workspace {
   display: grid;
-  grid-template-columns: 260px 1fr;
   flex: 1;
   min-height: 0;
   overflow: hidden;
+}
+
+/* ===== Resize handle ===== */
+
+.resize-handle {
+  width: 4px;
+  cursor: col-resize;
+  background: transparent;
+  transition: background 150ms;
+  z-index: 2;
+}
+
+.resize-handle:hover,
+.resize-handle:active {
+  background: rgba(88, 166, 255, 0.45);
+}
+
+body.resizing {
+  cursor: col-resize;
+  user-select: none;
+}
+
+body.resizing .resize-handle {
+  background: rgba(88, 166, 255, 0.45);
 }
 
 /* ===== Sidebar ===== */
