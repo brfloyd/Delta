@@ -128,6 +128,48 @@ const fileStatus = (file: DiffFile): { letter: string; cls: string } => {
   return { letter: "M", cls: "st-mod" };
 };
 
+const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+function injectSearchMarks(html: string, query: string): string {
+  const re = new RegExp(escapeRegex(query), "gi");
+  let result = "";
+  let i = 0;
+  while (i < html.length) {
+    if (html[i] === "<") {
+      const close = html.indexOf(">", i);
+      if (close === -1) { result += html.slice(i); break; }
+      result += html.slice(i, close + 1);
+      i = close + 1;
+    } else if (html[i] === "&") {
+      const semi = html.indexOf(";", i);
+      if (semi === -1 || semi - i > 8) {
+        result += html[i];
+        i++;
+      } else {
+        result += html.slice(i, semi + 1);
+        i = semi + 1;
+      }
+    } else {
+      let end = i;
+      while (end < html.length && html[end] !== "<" && html[end] !== "&") end++;
+      result += html.slice(i, end).replace(re, (m) => `<mark class="search-hit">${m}</mark>`);
+      i = end;
+    }
+  }
+  return result;
+}
+
+function highlightSearchInText(text: string, query: string) {
+  const re = new RegExp(`(${escapeRegex(query)})`, "gi");
+  const parts = text.split(re);
+  if (parts.length <= 1) return text;
+  return parts.map((part, i) =>
+    i % 2 === 1
+      ? <mark key={i} className="search-hit">{part}</mark>
+      : <span key={i}>{part}</span>
+  );
+}
+
 const StatBar = memo(function StatBar({ a, d }: { a: number; d: number }) {
   const t = a + d;
   if (t === 0) return null;
@@ -141,7 +183,7 @@ const StatBar = memo(function StatBar({ a, d }: { a: number; d: number }) {
   );
 });
 
-const DiffLine = memo(function DiffLine({ change, lang }: { change: DiffChange; lang: string }) {
+const DiffLine = memo(function DiffLine({ change, lang, searchQuery }: { change: DiffChange; lang: string; searchQuery: string }) {
   const oldLn = change.type === "del" ? change.ln : change.type === "normal" ? change.ln1 : "";
   const newLn = change.type === "add" ? change.ln : change.type === "normal" ? change.ln2 : "";
   const raw = change.content.slice(1) || " ";
@@ -154,39 +196,45 @@ const DiffLine = memo(function DiffLine({ change, lang }: { change: DiffChange; 
     }
   }, [raw, lang]);
 
+  const renderedHtml = useMemo(() => {
+    if (!highlighted) return null;
+    return searchQuery ? injectSearchMarks(highlighted, searchQuery) : highlighted;
+  }, [highlighted, searchQuery]);
+
   return (
     <div className={`ln-row ${change.type}`}>
       <span className="gutter old">{oldLn ?? ""}</span>
       <span className="gutter new">{newLn ?? ""}</span>
       <span className="pfx">{change.type === "add" ? "+" : change.type === "del" ? "-" : " "}</span>
-      {highlighted
-        ? <code dangerouslySetInnerHTML={{ __html: highlighted }} />
-        : <code>{raw}</code>
+      {renderedHtml
+        ? <code dangerouslySetInnerHTML={{ __html: renderedHtml }} />
+        : <code>{searchQuery ? highlightSearchInText(raw, searchQuery) : raw}</code>
       }
     </div>
   );
 });
 
-const Chunk = memo(function Chunk({ chunk, fk, lang }: { chunk: DiffChunk; fk: string; lang: string }) {
+const Chunk = memo(function Chunk({ chunk, fk, lang, searchQuery }: { chunk: DiffChunk; fk: string; lang: string; searchQuery: string }) {
   return (
     <div className="chunk">
       <div className="chunk-hd">{chunk.content}</div>
-      {chunk.changes.map((c, i) => <DiffLine key={`${fk}-${i}`} change={c} lang={lang} />)}
+      {chunk.changes.map((c, i) => <DiffLine key={`${fk}-${i}`} change={c} lang={lang} searchQuery={searchQuery} />)}
     </div>
   );
 });
 
-const FileDiff = memo(function FileDiff({ file }: { file: DiffFile }) {
+const FileDiff = memo(function FileDiff({ file, searchQuery }: { file: DiffFile; searchQuery: string }) {
   const [open, setOpen] = useState(true);
   const label = fileLabel(file);
   const st = fileStatus(file);
   const lang = useMemo(() => detectLang(label), [label]);
+  const isOpen = open || !!searchQuery;
 
   return (
     <article className="file-card" data-file={label}>
       <header onClick={() => setOpen((v) => !v)}>
         <div className="fc-left">
-          <span className={`chev ${open ? "open" : ""}`}>&#x203A;</span>
+          <span className={`chev ${isOpen ? "open" : ""}`}>&#x203A;</span>
           <span className={`badge ${st.cls}`}>{st.letter}</span>
           <h2>{label}</h2>
         </div>
@@ -196,10 +244,10 @@ const FileDiff = memo(function FileDiff({ file }: { file: DiffFile }) {
           <StatBar a={file.additions} d={file.deletions} />
         </div>
       </header>
-      {open && (
+      {isOpen && (
         <div className="diff-body">
           {file.chunks.map((chunk, i) => (
-            <Chunk key={`${label}-c${i}`} chunk={chunk} fk={`${label}-c${i}`} lang={lang} />
+            <Chunk key={`${label}-c${i}`} chunk={chunk} fk={`${label}-c${i}`} lang={lang} searchQuery={searchQuery} />
           ))}
         </div>
       )}
@@ -237,6 +285,66 @@ const FileItem = memo(function FileItem({
   );
 });
 
+function SearchBar({
+  query,
+  onQueryChange,
+  onClose,
+  onNext,
+  onPrev,
+  currentMatch,
+  totalMatches,
+  focusTrigger,
+}: {
+  query: string;
+  onQueryChange: (q: string) => void;
+  onClose: () => void;
+  onNext: () => void;
+  onPrev: () => void;
+  currentMatch: number;
+  totalMatches: number;
+  focusTrigger: number;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    inputRef.current?.focus();
+    inputRef.current?.select();
+  }, [focusTrigger]);
+
+  return (
+    <div className="search-bar">
+      <svg className="search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="11" cy="11" r="8" />
+        <line x1="21" y1="21" x2="16.65" y2="16.65" />
+      </svg>
+      <input
+        ref={inputRef}
+        type="text"
+        value={query}
+        onChange={(e) => onQueryChange(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Escape") onClose();
+          if (e.key === "Enter") { e.preventDefault(); e.shiftKey ? onPrev() : onNext(); }
+        }}
+        placeholder="Search in diff…"
+        spellCheck={false}
+      />
+      <span className="search-count">
+        {query ? `${totalMatches > 0 ? currentMatch + 1 : 0} of ${totalMatches}` : ""}
+      </span>
+      <button className="search-nav" onClick={onPrev} disabled={totalMatches === 0} title="Previous (Shift+Enter)">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="18 15 12 9 6 15" /></svg>
+      </button>
+      <button className="search-nav" onClick={onNext} disabled={totalMatches === 0} title="Next (Enter)">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9" /></svg>
+      </button>
+      <button className="search-nav" onClick={onClose} title="Close (Escape)">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+      </button>
+    </div>
+  );
+}
+
 type Tab = { id: string };
 
 const DiffTabContent = memo(function DiffTabContent({
@@ -256,6 +364,18 @@ const DiffTabContent = memo(function DiffTabContent({
   const [activeFile, setActiveFile] = useState("");
   const [hasCompared, setHasCompared] = useState(false);
   const diffRef = useRef<HTMLDivElement>(null);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchInput, setSearchInput] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [currentMatch, setCurrentMatch] = useState(0);
+  const [totalMatches, setTotalMatches] = useState(0);
+  const [searchFocus, setSearchFocus] = useState(0);
+
+  useEffect(() => {
+    if (!searchInput) { setSearchQuery(""); return; }
+    const t = setTimeout(() => setSearchQuery(searchInput), 150);
+    return () => clearTimeout(t);
+  }, [searchInput]);
 
   const stats = useMemo(
     () =>
@@ -291,6 +411,44 @@ const DiffTabContent = memo(function DiffTabContent({
     cards.forEach((el) => observer.observe(el));
     return () => observer.disconnect();
   }, [files, active]);
+
+  useEffect(() => {
+    if (!active) return;
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "f") {
+        e.preventDefault();
+        setSearchOpen(true);
+        setSearchFocus((n) => n + 1);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [active]);
+
+  useEffect(() => {
+    if (!searchQuery) { setTotalMatches(0); return; }
+    const id = requestAnimationFrame(() => {
+      const n = diffRef.current?.querySelectorAll(".search-hit").length ?? 0;
+      setTotalMatches(n);
+      setCurrentMatch((c) => (n === 0 ? 0 : Math.min(c, n - 1)));
+    });
+    return () => cancelAnimationFrame(id);
+  }, [searchQuery, files]);
+
+  useEffect(() => {
+    const pane = diffRef.current;
+    if (!pane || !searchQuery || totalMatches === 0) return;
+    const id = requestAnimationFrame(() => {
+      const hits = pane.querySelectorAll<HTMLElement>(".search-hit");
+      hits.forEach((el) => el.classList.remove("current"));
+      const hit = hits[currentMatch];
+      if (hit) {
+        hit.classList.add("current");
+        hit.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+    });
+    return () => cancelAnimationFrame(id);
+  }, [currentMatch, totalMatches, searchQuery]);
 
   const selectRepo = async () => {
     setError("");
@@ -333,10 +491,30 @@ const DiffTabContent = memo(function DiffTabContent({
     el?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
+  const closeSearch = () => {
+    setSearchOpen(false);
+    setSearchInput("");
+    setSearchQuery("");
+    setCurrentMatch(0);
+  };
+
+  const goNext = () => {
+    if (totalMatches > 0) setCurrentMatch((c) => (c + 1) % totalMatches);
+  };
+
+  const goPrev = () => {
+    if (totalMatches > 0) setCurrentMatch((c) => (c - 1 + totalMatches) % totalMatches);
+  };
+
+  const handleSearchChange = (q: string) => {
+    setSearchInput(q);
+    setCurrentMatch(0);
+  };
+
   const repoName = repoPath ? repoPath.split("/").pop() : null;
 
   return (
-    <div className={`tab-content${active ? " active" : ""}`}>
+    <div className={`tab-content${active ? " active" : ""}${searchQuery ? " searching" : ""}`}>
       <section className="ctrl">
         <div className="br-row">
           <div className="br-row-left">
@@ -401,6 +579,18 @@ const DiffTabContent = memo(function DiffTabContent({
         </aside>
 
         <div className="diff-pane" ref={diffRef}>
+          {searchOpen && (
+            <SearchBar
+              query={searchInput}
+              onQueryChange={handleSearchChange}
+              onClose={closeSearch}
+              onNext={goNext}
+              onPrev={goPrev}
+              currentMatch={currentMatch}
+              totalMatches={totalMatches}
+              focusTrigger={searchFocus}
+            />
+          )}
           {files.length === 0 ? (
             <div className="empty">
               <svg width="64" height="64" viewBox="0 0 24 24" opacity=".3">
@@ -432,7 +622,7 @@ const DiffTabContent = memo(function DiffTabContent({
                   Refresh
                 </button>
               </div>
-              {files.map((f) => <FileDiff key={fileLabel(f)} file={f} />)}
+              {files.map((f) => <FileDiff key={fileLabel(f)} file={f} searchQuery={searchQuery} />)}
             </>
           )}
         </div>

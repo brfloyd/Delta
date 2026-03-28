@@ -692,6 +692,99 @@ select:focus {
   color: var(--del-fg);
 }
 
+/* ===== Search bar ===== */
+
+.search-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  background: var(--bg-2);
+  border: 1px solid var(--bd-s);
+  border-radius: var(--r);
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  margin-bottom: 12px;
+}
+
+.search-bar .search-icon {
+  flex-shrink: 0;
+  color: var(--t3);
+}
+
+.search-bar input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--t1);
+  font-size: 13px;
+  font-family: var(--sans);
+  min-width: 0;
+}
+
+.search-bar input::placeholder {
+  color: var(--t3);
+}
+
+.search-count {
+  font-size: 11px;
+  color: var(--t3);
+  white-space: nowrap;
+  flex-shrink: 0;
+  min-width: 55px;
+  text-align: right;
+}
+
+.search-nav {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--t2);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 80ms;
+}
+
+.search-nav:hover {
+  background: var(--bg-3);
+  color: var(--t1);
+}
+
+.search-nav:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.search-nav:disabled:hover {
+  background: transparent;
+  color: var(--t2);
+}
+
+/* ===== Search highlighting ===== */
+
+.search-hit {
+  background: rgba(210, 153, 34, 0.4);
+  border-radius: 2px;
+  color: inherit;
+}
+
+.search-hit.current {
+  background: rgba(210, 153, 34, 0.8);
+  outline: 2px solid #d29922;
+  outline-offset: -1px;
+}
+
+.searching .file-card {
+  content-visibility: visible;
+}
+
 /* ===== Spinner ===== */
 
 .spin {
