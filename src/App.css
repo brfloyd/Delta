@@ -1,0 +1,7 @@
+.ln-row.del .removed {
+    background-color: #ff000020;
+}
+
+.ln-row.add .added {
+    background-color: #00ff0020;
+}

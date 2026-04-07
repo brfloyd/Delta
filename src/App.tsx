@@ -8,6 +8,7 @@ import diff from "highlight.js/lib/languages/diff";
 import go from "highlight.js/lib/languages/go";
 import graphql from "highlight.js/lib/languages/graphql";
 import java from "highlight.js/lib/languages/java";
+import "./App.css";
 import javascript from "highlight.js/lib/languages/javascript";
 import json from "highlight.js/lib/languages/json";
 import kotlin from "highlight.js/lib/languages/kotlin";
@@ -53,30 +54,53 @@ hljs.registerLanguage("xml", xml);
 hljs.registerLanguage("yaml", yaml);
 
 const EXT_TO_LANG: Record<string, string> = {
-  ".js": "javascript", ".mjs": "javascript", ".cjs": "javascript", ".jsx": "javascript",
-  ".ts": "typescript", ".tsx": "typescript", ".mts": "typescript", ".cts": "typescript",
-  ".py": "python", ".pyw": "python",
-  ".rb": "ruby", ".rake": "ruby",
+  ".js": "javascript",
+  ".mjs": "javascript",
+  ".cjs": "javascript",
+  ".jsx": "javascript",
+  ".ts": "typescript",
+  ".tsx": "typescript",
+  ".mts": "typescript",
+  ".cts": "typescript",
+  ".py": "python",
+  ".pyw": "python",
+  ".rb": "ruby",
+  ".rake": "ruby",
   ".rs": "rust",
   ".go": "go",
   ".java": "java",
-  ".kt": "kotlin", ".kts": "kotlin",
+  ".kt": "kotlin",
+  ".kts": "kotlin",
   ".swift": "swift",
-  ".c": "c", ".h": "c",
-  ".cpp": "cpp", ".cc": "cpp", ".cxx": "cpp", ".hpp": "cpp",
+  ".c": "c",
+  ".h": "c",
+  ".cpp": "cpp",
+  ".cc": "cpp",
+  ".cxx": "cpp",
+  ".hpp": "cpp",
   ".cs": "csharp",
   ".php": "php",
   ".lua": "lua",
   ".sql": "sql",
-  ".sh": "bash", ".bash": "bash", ".zsh": "bash",
+  ".sh": "bash",
+  ".bash": "bash",
+  ".zsh": "bash",
   ".css": "css",
-  ".scss": "scss", ".sass": "scss",
-  ".html": "xml", ".htm": "xml", ".xml": "xml", ".svg": "xml",
+  ".scss": "scss",
+  ".sass": "scss",
+  ".html": "xml",
+  ".htm": "xml",
+  ".xml": "xml",
+  ".svg": "xml",
   ".json": "json",
-  ".yaml": "yaml", ".yml": "yaml",
-  ".md": "markdown", ".mdx": "markdown",
-  ".graphql": "graphql", ".gql": "graphql",
-  ".diff": "diff", ".patch": "diff",
+  ".yaml": "yaml",
+  ".yml": "yaml",
+  ".md": "markdown",
+  ".mdx": "markdown",
+  ".graphql": "graphql",
+  ".gql": "graphql",
+  ".diff": "diff",
+  ".patch": "diff",
 };
 
 const detectLang = (filename: string): string => {
@@ -85,12 +109,19 @@ const detectLang = (filename: string): string => {
   return EXT_TO_LANG[filename.slice(dot).toLowerCase()] || "plaintext";
 };
 
+type DiffPart = {
+  value: string;
+  added?: boolean;
+  removed?: boolean;
+};
+
 type DiffChange = {
   type: "add" | "del" | "normal";
   content: string;
   ln?: number;
   ln1?: number;
   ln2?: number;
+  parts?: DiffPart[];
 };
 
 type DiffChunk = {
@@ -123,7 +154,11 @@ const splitPath = (label: string) => {
 const fileStatus = (file: DiffFile): { letter: string; cls: string } => {
   if (file.new) return { letter: "A", cls: "st-add" };
   if (file.deleted) return { letter: "D", cls: "st-del" };
-  if (file.from !== file.to && file.from !== "/dev/null" && file.to !== "/dev/null")
+  if (
+    file.from !== file.to &&
+    file.from !== "/dev/null" &&
+    file.to !== "/dev/null"
+  )
     return { letter: "R", cls: "st-ren" };
   return { letter: "M", cls: "st-mod" };
 };
@@ -137,7 +172,10 @@ function injectSearchMarks(html: string, query: string): string {
   while (i < html.length) {
     if (html[i] === "<") {
       const close = html.indexOf(">", i);
-      if (close === -1) { result += html.slice(i); break; }
+      if (close === -1) {
+        result += html.slice(i);
+        break;
+      }
       result += html.slice(i, close + 1);
       i = close + 1;
     } else if (html[i] === "&") {
@@ -152,7 +190,9 @@ function injectSearchMarks(html: string, query: string): string {
     } else {
       let end = i;
       while (end < html.length && html[end] !== "<" && html[end] !== "&") end++;
-      result += html.slice(i, end).replace(re, (m) => `<mark class="search-hit">${m}</mark>`);
+      result += html
+        .slice(i, end)
+        .replace(re, (m) => `<mark class="search-hit">${m}</mark>`);
       i = end;
     }
   }
@@ -164,9 +204,13 @@ function highlightSearchInText(text: string, query: string) {
   const parts = text.split(re);
   if (parts.length <= 1) return text;
   return parts.map((part, i) =>
-    i % 2 === 1
-      ? <mark key={i} className="search-hit">{part}</mark>
-      : <span key={i}>{part}</span>
+    i % 2 === 1 ? (
+      <mark key={i} className="search-hit">
+        {part}
+      </mark>
+    ) : (
+      <span key={i}>{part}</span>
+    ),
   );
 }
 
@@ -177,16 +221,60 @@ const StatBar = memo(function StatBar({ a, d }: { a: number; d: number }) {
   const ab = Math.round((a / t) * n);
   return (
     <span className="stat-bar">
-      {Array.from({ length: ab }, (_, i) => <span key={`a${i}`} className="blk add" />)}
-      {Array.from({ length: n - ab }, (_, i) => <span key={`d${i}`} className="blk del" />)}
+      {Array.from({ length: ab }, (_, i) => (
+        <span key={`a${i}`} className="blk add" />
+      ))}
+      {Array.from({ length: n - ab }, (_, i) => (
+        <span key={`d${i}`} className="blk del" />
+      ))}
     </span>
   );
 });
 
-const DiffLine = memo(function DiffLine({ change, lang, searchQuery }: { change: DiffChange; lang: string; searchQuery: string }) {
-  const oldLn = change.type === "del" ? change.ln : change.type === "normal" ? change.ln1 : "";
-  const newLn = change.type === "add" ? change.ln : change.type === "normal" ? change.ln2 : "";
+const DiffLine = memo(function DiffLine({
+  change,
+  lang,
+  searchQuery,
+}: {
+  change: DiffChange;
+  lang: string;
+  searchQuery: string;
+}) {
+  const oldLn =
+    change.type === "del"
+      ? change.ln
+      : change.type === "normal"
+        ? change.ln1
+        : "";
+  const newLn =
+    change.type === "add"
+      ? change.ln
+      : change.type === "normal"
+        ? change.ln2
+        : "";
   const raw = change.content.slice(1) || " ";
+
+  if (change.parts) {
+    const parts = change.parts.map((part, i) => {
+      const className = part.added ? "added" : part.removed ? "removed" : "";
+      return (
+        <span key={i} className={className}>
+          {part.value}
+        </span>
+      );
+    });
+    return (
+      <div className={`ln-row ${change.type}`}>
+        <span className="gutter old">{oldLn ?? ""}</span>
+        <span className="gutter new">{newLn ?? ""}</span>
+        <span className="pfx">
+          {change.type === "add" ? "+" : change.type === "del" ? "-" : " "}
+        </span>
+        <code>{parts}</code>
+      </div>
+    );
+  }
+
   const highlighted = useMemo(() => {
     if (lang === "plaintext" || !raw.trim()) return null;
     try {
@@ -198,32 +286,62 @@ const DiffLine = memo(function DiffLine({ change, lang, searchQuery }: { change:
 
   const renderedHtml = useMemo(() => {
     if (!highlighted) return null;
-    return searchQuery ? injectSearchMarks(highlighted, searchQuery) : highlighted;
+    return searchQuery
+      ? injectSearchMarks(highlighted, searchQuery)
+      : highlighted;
   }, [highlighted, searchQuery]);
 
   return (
     <div className={`ln-row ${change.type}`}>
       <span className="gutter old">{oldLn ?? ""}</span>
       <span className="gutter new">{newLn ?? ""}</span>
-      <span className="pfx">{change.type === "add" ? "+" : change.type === "del" ? "-" : " "}</span>
-      {renderedHtml
-        ? <code dangerouslySetInnerHTML={{ __html: renderedHtml }} />
-        : <code>{searchQuery ? highlightSearchInText(raw, searchQuery) : raw}</code>
-      }
+      <span className="pfx">
+        {change.type === "add" ? "+" : change.type === "del" ? "-" : " "}
+      </span>
+      {renderedHtml ? (
+        <code dangerouslySetInnerHTML={{ __html: renderedHtml }} />
+      ) : (
+        <code>
+          {searchQuery ? highlightSearchInText(raw, searchQuery) : raw}
+        </code>
+      )}
     </div>
   );
 });
 
-const Chunk = memo(function Chunk({ chunk, fk, lang, searchQuery }: { chunk: DiffChunk; fk: string; lang: string; searchQuery: string }) {
+const Chunk = memo(function Chunk({
+  chunk,
+  fk,
+  lang,
+  searchQuery,
+}: {
+  chunk: DiffChunk;
+  fk: string;
+  lang: string;
+  searchQuery: string;
+}) {
   return (
     <div className="chunk">
       <div className="chunk-hd">{chunk.content}</div>
-      {chunk.changes.map((c, i) => <DiffLine key={`${fk}-${i}`} change={c} lang={lang} searchQuery={searchQuery} />)}
+      {chunk.changes.map((c, i) => (
+        <DiffLine
+          key={`${fk}-${i}`}
+          change={c}
+          lang={lang}
+          searchQuery={searchQuery}
+        />
+      ))}
     </div>
   );
 });
 
-const FileDiff = memo(function FileDiff({ file, searchQuery }: { file: DiffFile; searchQuery: string }) {
+const FileDiff = memo(function FileDiff({
+  file,
+  searchQuery,
+}: {
+  file: DiffFile;
+  searchQuery: string;
+}) {
   const [open, setOpen] = useState(true);
   const label = fileLabel(file);
   const st = fileStatus(file);
@@ -247,7 +365,13 @@ const FileDiff = memo(function FileDiff({ file, searchQuery }: { file: DiffFile;
       {isOpen && (
         <div className="diff-body">
           {file.chunks.map((chunk, i) => (
-            <Chunk key={`${label}-c${i}`} chunk={chunk} fk={`${label}-c${i}`} lang={lang} searchQuery={searchQuery} />
+            <Chunk
+              key={`${label}-c${i}`}
+              chunk={chunk}
+              fk={`${label}-c${i}`}
+              lang={lang}
+              searchQuery={searchQuery}
+            />
           ))}
         </div>
       )}
@@ -313,7 +437,17 @@ function SearchBar({
 
   return (
     <div className="search-bar">
-      <svg className="search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <svg
+        className="search-icon"
+        width="14"
+        height="14"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
         <circle cx="11" cy="11" r="8" />
         <line x1="21" y1="21" x2="16.65" y2="16.65" />
       </svg>
@@ -324,22 +458,65 @@ function SearchBar({
         onChange={(e) => onQueryChange(e.target.value)}
         onKeyDown={(e) => {
           if (e.key === "Escape") onClose();
-          if (e.key === "Enter") { e.preventDefault(); e.shiftKey ? onPrev() : onNext(); }
+          if (e.key === "Enter") {
+            e.preventDefault();
+            e.shiftKey ? onPrev() : onNext();
+          }
         }}
         placeholder="Search in diff…"
         spellCheck={false}
       />
       <span className="search-count">
-        {query ? `${totalMatches > 0 ? currentMatch + 1 : 0} of ${totalMatches}` : ""}
+        {query
+          ? `${totalMatches > 0 ? currentMatch + 1 : 0} of ${totalMatches}`
+          : ""}
       </span>
-      <button className="search-nav" onClick={onPrev} disabled={totalMatches === 0} title="Previous (Shift+Enter)">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="18 15 12 9 6 15" /></svg>
+      <button
+        className="search-nav"
+        onClick={onPrev}
+        disabled={totalMatches === 0}
+        title="Previous (Shift+Enter)"
+      >
+        <svg
+          width="12"
+          height="12"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+        >
+          <polyline points="18 15 12 9 6 15" />
+        </svg>
       </button>
-      <button className="search-nav" onClick={onNext} disabled={totalMatches === 0} title="Next (Enter)">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9" /></svg>
+      <button
+        className="search-nav"
+        onClick={onNext}
+        disabled={totalMatches === 0}
+        title="Next (Enter)"
+      >
+        <svg
+          width="12"
+          height="12"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+        >
+          <polyline points="6 9 12 15 18 9" />
+        </svg>
       </button>
       <button className="search-nav" onClick={onClose} title="Close (Escape)">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+        <svg
+          width="12"
+          height="12"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+        >
+          <line x1="18" y1="6" x2="6" y2="18" />
+          <line x1="6" y1="6" x2="18" y2="18" />
+        </svg>
       </button>
     </div>
   );
@@ -374,7 +551,10 @@ const DiffTabContent = memo(function DiffTabContent({
     const rect = ws.getBoundingClientRect();
     document.body.classList.add("resizing");
     const onMove = (ev: MouseEvent) => {
-      const w = Math.min(rect.width * 0.5, Math.max(160, ev.clientX - rect.left));
+      const w = Math.min(
+        rect.width * 0.5,
+        Math.max(160, ev.clientX - rect.left),
+      );
       setSidebarW(w);
     };
     const onUp = () => {
@@ -394,7 +574,10 @@ const DiffTabContent = memo(function DiffTabContent({
   const [searchFocus, setSearchFocus] = useState(0);
 
   useEffect(() => {
-    if (!searchInput) { setSearchQuery(""); return; }
+    if (!searchInput) {
+      setSearchQuery("");
+      return;
+    }
     const t = setTimeout(() => setSearchQuery(searchInput), 150);
     return () => clearTimeout(t);
   }, [searchInput]);
@@ -448,7 +631,10 @@ const DiffTabContent = memo(function DiffTabContent({
   }, [active]);
 
   useEffect(() => {
-    if (!searchQuery) { setTotalMatches(0); return; }
+    if (!searchQuery) {
+      setTotalMatches(0);
+      return;
+    }
     const id = requestAnimationFrame(() => {
       const n = diffRef.current?.querySelectorAll(".search-hit").length ?? 0;
       setTotalMatches(n);
@@ -498,7 +684,11 @@ const DiffTabContent = memo(function DiffTabContent({
     setError("");
     setLoading(true);
     try {
-      const r = await window.diffViewerAPI.getDiff({ repoPath, workingBranch, targetBranch });
+      const r = await window.diffViewerAPI.getDiff({
+        repoPath,
+        workingBranch,
+        targetBranch,
+      });
       setFiles(r.files as DiffFile[]);
       setHasCompared(true);
     } catch (err) {
@@ -509,7 +699,9 @@ const DiffTabContent = memo(function DiffTabContent({
   };
 
   const scrollTo = (label: string) => {
-    const el = diffRef.current?.querySelector(`[data-file="${CSS.escape(label)}"]`);
+    const el = diffRef.current?.querySelector(
+      `[data-file="${CSS.escape(label)}"]`,
+    );
     el?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
@@ -525,7 +717,8 @@ const DiffTabContent = memo(function DiffTabContent({
   };
 
   const goPrev = () => {
-    if (totalMatches > 0) setCurrentMatch((c) => (c - 1 + totalMatches) % totalMatches);
+    if (totalMatches > 0)
+      setCurrentMatch((c) => (c - 1 + totalMatches) % totalMatches);
   };
 
   const handleSearchChange = (q: string) => {
@@ -536,7 +729,9 @@ const DiffTabContent = memo(function DiffTabContent({
   const repoName = repoPath ? repoPath.split("/").pop() : null;
 
   return (
-    <div className={`tab-content${active ? " active" : ""}${searchQuery ? " searching" : ""}`}>
+    <div
+      className={`tab-content${active ? " active" : ""}${searchQuery ? " searching" : ""}`}
+    >
       <section className="ctrl">
         <div className="br-row">
           <div className="br-row-left">
@@ -550,21 +745,39 @@ const DiffTabContent = memo(function DiffTabContent({
               <div className="br-pair">
                 <label>
                   <span className="lbl">base</span>
-                  <select value={targetBranch} onChange={(e) => setTargetBranch(e.target.value)}>
+                  <select
+                    value={targetBranch}
+                    onChange={(e) => setTargetBranch(e.target.value)}
+                  >
                     <option value="">select&hellip;</option>
-                    {branches.map((b) => <option key={b} value={b}>{b}</option>)}
+                    {branches.map((b) => (
+                      <option key={b} value={b}>
+                        {b}
+                      </option>
+                    ))}
                   </select>
                 </label>
                 <span className="arrow">&larr;</span>
                 <label>
                   <span className="lbl">compare</span>
-                  <select value={workingBranch} onChange={(e) => setWorkingBranch(e.target.value)}>
+                  <select
+                    value={workingBranch}
+                    onChange={(e) => setWorkingBranch(e.target.value)}
+                  >
                     <option value="">select&hellip;</option>
-                    {branches.map((b) => <option key={b} value={b}>{b}</option>)}
+                    {branches.map((b) => (
+                      <option key={b} value={b}>
+                        {b}
+                      </option>
+                    ))}
                   </select>
                 </label>
               </div>
-              <button className="btn accent" onClick={runDiff} disabled={!workingBranch || !targetBranch || loading}>
+              <button
+                className="btn accent"
+                onClick={runDiff}
+                disabled={!workingBranch || !targetBranch || loading}
+              >
                 {loading ? <span className="spin" /> : "Compare"}
               </button>
             </>
@@ -574,7 +787,11 @@ const DiffTabContent = memo(function DiffTabContent({
 
       {error && <div className="err">{error}</div>}
 
-      <div className="workspace" ref={workspaceRef} style={{ gridTemplateColumns: `${sidebarW}px auto 1fr` }}>
+      <div
+        className="workspace"
+        ref={workspaceRef}
+        style={{ gridTemplateColumns: `${sidebarW}px auto 1fr` }}
+      >
         <aside className="sidebar">
           <div className="sb-head">
             <span>Files changed</span>
@@ -589,12 +806,21 @@ const DiffTabContent = memo(function DiffTabContent({
           <div className="sb-body">
             {files.length === 0 ? (
               <p className="sb-empty">
-                {repoPath ? "Select branches and compare." : "Open a repository to start."}
+                {repoPath
+                  ? "Select branches and compare."
+                  : "Open a repository to start."}
               </p>
             ) : (
               files.map((f) => {
                 const l = fileLabel(f);
-                return <FileItem key={l} file={f} active={activeFile === l} onClick={() => scrollTo(l)} />;
+                return (
+                  <FileItem
+                    key={l}
+                    file={f}
+                    active={activeFile === l}
+                    onClick={() => scrollTo(l)}
+                  />
+                );
               })
             )}
           </div>
@@ -631,20 +857,46 @@ const DiffTabContent = memo(function DiffTabContent({
             <>
               <div className="summary-row">
                 <p className="summary">
-                  Showing <strong>{files.length}</strong> changed file{files.length !== 1 && "s"} with{" "}
-                  <span className="additions">{stats.additions} additions</span> and{" "}
-                  <span className="deletions">{stats.deletions} deletions</span>.
+                  Showing <strong>{files.length}</strong> changed file
+                  {files.length !== 1 && "s"} with{" "}
+                  <span className="additions">{stats.additions} additions</span>{" "}
+                  and{" "}
+                  <span className="deletions">{stats.deletions} deletions</span>
+                  .
                 </p>
-                <button className="btn ghost reload-btn" onClick={runDiff} disabled={loading} title="Refresh diff">
+                <button
+                  className="btn ghost reload-btn"
+                  onClick={runDiff}
+                  disabled={loading}
+                  title="Refresh diff"
+                >
                   {loading ? (
                     <span className="spin" />
                   ) : (
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 1 1-6.22-8.56" /><polyline points="21 3 21 9 15 9" /></svg>
+                    <svg
+                      width="14"
+                      height="14"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M21 12a9 9 0 1 1-6.22-8.56" />
+                      <polyline points="21 3 21 9 15 9" />
+                    </svg>
                   )}
                   Refresh
                 </button>
               </div>
-              {files.map((f) => <FileDiff key={fileLabel(f)} file={f} searchQuery={searchQuery} />)}
+              {files.map((f) => (
+                <FileDiff
+                  key={fileLabel(f)}
+                  file={f}
+                  searchQuery={searchQuery}
+                />
+              ))}
             </>
           )}
         </div>
@@ -702,18 +954,25 @@ function App() {
               className={`tab-btn${tab.id === activeTabId ? " active" : ""}`}
               onClick={() => setActiveTabId(tab.id)}
             >
-              <span className="tab-label">{tabLabels[tab.id] || "New Tab"}</span>
+              <span className="tab-label">
+                {tabLabels[tab.id] || "New Tab"}
+              </span>
               {tabs.length > 1 && (
                 <span
                   className="tab-close"
-                  onClick={(e) => { e.stopPropagation(); closeTab(tab.id); }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    closeTab(tab.id);
+                  }}
                 >
                   &times;
                 </span>
               )}
             </button>
           ))}
-          <button className="tab-add" onClick={addTab} title="New tab">+</button>
+          <button className="tab-add" onClick={addTab} title="New tab">
+            +
+          </button>
         </div>
       </header>
 
