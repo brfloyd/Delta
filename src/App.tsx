@@ -253,13 +253,30 @@ const DiffLine = memo(function DiffLine({
         ? change.ln2
         : "";
   const raw = change.content.slice(1) || " ";
+  const parts = change.parts;
 
-  if (change.parts) {
-    const parts = change.parts.map((part, i) => {
+  const highlighted = useMemo(() => {
+    if (parts || lang === "plaintext" || !raw.trim()) return null;
+    try {
+      return hljs.highlight(raw, { language: lang }).value;
+    } catch {
+      return null;
+    }
+  }, [parts, raw, lang]);
+
+  const renderedHtml = useMemo(() => {
+    if (!highlighted) return null;
+    return searchQuery
+      ? injectSearchMarks(highlighted, searchQuery)
+      : highlighted;
+  }, [highlighted, searchQuery]);
+
+  if (parts) {
+    const inlineParts = parts.map((part, i) => {
       const className = part.added ? "added" : part.removed ? "removed" : "";
       return (
         <span key={i} className={className}>
-          {part.value}
+          {searchQuery ? highlightSearchInText(part.value, searchQuery) : part.value}
         </span>
       );
     });
@@ -270,26 +287,10 @@ const DiffLine = memo(function DiffLine({
         <span className="pfx">
           {change.type === "add" ? "+" : change.type === "del" ? "-" : " "}
         </span>
-        <code>{parts}</code>
+        <code>{inlineParts}</code>
       </div>
     );
   }
-
-  const highlighted = useMemo(() => {
-    if (lang === "plaintext" || !raw.trim()) return null;
-    try {
-      return hljs.highlight(raw, { language: lang }).value;
-    } catch {
-      return null;
-    }
-  }, [raw, lang]);
-
-  const renderedHtml = useMemo(() => {
-    if (!highlighted) return null;
-    return searchQuery
-      ? injectSearchMarks(highlighted, searchQuery)
-      : highlighted;
-  }, [highlighted, searchQuery]);
 
   return (
     <div className={`ln-row ${change.type}`}>
@@ -460,7 +461,8 @@ function SearchBar({
           if (e.key === "Escape") onClose();
           if (e.key === "Enter") {
             e.preventDefault();
-            e.shiftKey ? onPrev() : onNext();
+            if (e.shiftKey) onPrev();
+            else onNext();
           }
         }}
         placeholder="Search in diff…"

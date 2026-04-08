@@ -1,7 +1,15 @@
 .ln-row.del .removed {
-    background-color: #ff000020;
+    background-color: rgba(248, 113, 113, 0.2);
+    box-shadow: inset 0 0 0 1px rgba(248, 113, 113, 0.28);
+    border-radius: 3px;
 }
 
 .ln-row.add .added {
-    background-color: #00ff0020;
+    background-color: rgba(74, 222, 128, 0.18);
+    box-shadow: inset 0 0 0 1px rgba(74, 222, 128, 0.24);
+    border-radius: 3px;
+}
+
+.ln-row code > span {
+    display: inline;
 }
