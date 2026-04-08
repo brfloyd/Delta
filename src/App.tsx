@@ -947,7 +947,6 @@ function App() {
             <polygon points="12,2 1,22 10.5,22" fill="#3fb950" />
             <polygon points="12,2 23,22 13.5,22" fill="#f85149" />
           </svg>
-          <span className="app-name">Delta</span>
         </div>
         <div className="tab-strip">
           {tabs.map((tab) => (
