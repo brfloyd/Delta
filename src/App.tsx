@@ -638,7 +638,7 @@ const CodeGalaxy = memo(function CodeGalaxy({
     if (!drag || drag.pointerId !== e.pointerId) return;
     const dx = e.clientX - drag.x;
     const dy = e.clientY - drag.y;
-    if (Math.abs(dx) + Math.abs(dy) > 4) skipClickRef.current = true;
+    if (Math.abs(dx) + Math.abs(dy) > 6) skipClickRef.current = true;
     setYaw(drag.yaw + dx * 0.008);
     setPitch(Math.max(-1.12, Math.min(1.12, drag.pitch + dy * 0.006)));
   };
@@ -651,9 +651,13 @@ const CodeGalaxy = memo(function CodeGalaxy({
     if (e.currentTarget.hasPointerCapture(e.pointerId)) {
       e.currentTarget.releasePointerCapture(e.pointerId);
     }
-    window.setTimeout(() => {
-      skipClickRef.current = false;
-    }, 0);
+  };
+
+  const onClickCapture = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!skipClickRef.current) return;
+    e.preventDefault();
+    e.stopPropagation();
+    skipClickRef.current = false;
   };
 
   const onWheel = (e: React.WheelEvent<HTMLDivElement>) => {
@@ -676,6 +680,7 @@ const CodeGalaxy = memo(function CodeGalaxy({
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
+        onClickCapture={onClickCapture}
         onWheel={onWheel}
       >
         <svg className="galaxy-map" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Code Galaxy visualization">
@@ -705,10 +710,7 @@ const CodeGalaxy = memo(function CodeGalaxy({
                   cy={moon.y}
                   r={moon.radius}
                   opacity={moon.opacity}
-                  onClick={() => {
-                    if (skipClickRef.current) return;
-                    onSelectChunk(planet.label, moon.key);
-                  }}
+                  onClick={() => onSelectChunk(planet.label, moon.key)}
                 >
                   <title>{`${planet.name} - hunk (${moon.size} changed lines)`}</title>
                 </circle>
@@ -718,10 +720,7 @@ const CodeGalaxy = memo(function CodeGalaxy({
                 cx={planet.sx}
                 cy={planet.sy}
                 r={planet.radius}
-                onClick={() => {
-                  if (skipClickRef.current) return;
-                  onSelectFile(planet.label);
-                }}
+                onClick={() => onSelectFile(planet.label)}
               >
                 <title>{`${planet.label}\n+${planet.additions} / -${planet.deletions}`}</title>
               </circle>
