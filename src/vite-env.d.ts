@@ -15,6 +15,11 @@ type DiffPayloadFile = {
   deleted: boolean;
 };
 
+type FileContentResponse = {
+  exists: boolean;
+  lines: string[];
+};
+
 declare global {
   interface Window {
     diffViewerAPI: {
@@ -25,6 +30,11 @@ declare global {
         workingBranch: string;
         targetBranch: string;
       }) => Promise<{ files: DiffPayloadFile[] }>;
+      getFileContent: (payload: {
+        repoPath: string;
+        ref: string;
+        filePath: string;
+      }) => Promise<FileContentResponse>;
     };
   }
 }

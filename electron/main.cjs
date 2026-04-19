@@ -68,6 +68,23 @@ ipcMain.handle("repo:diff", async (_event, payload) => {
   return { files: parsed };
 });
 
+ipcMain.handle("repo:file-content", async (_event, payload) => {
+  const { repoPath, ref, filePath } = payload;
+  const git = await getGit(repoPath);
+  try {
+    const content = await git.show([`${ref}:${filePath}`]);
+    return {
+      exists: true,
+      lines: content.split(/\r?\n/),
+    };
+  } catch {
+    return {
+      exists: false,
+      lines: [],
+    };
+  }
+});
+
 app.whenReady().then(() => {
   createWindow();
 

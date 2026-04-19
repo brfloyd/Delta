@@ -128,6 +128,18 @@ const fileStatus = (file: DiffFile): { letter: string; cls: string } => {
   return { letter: "M", cls: "st-mod" };
 };
 
+const stripGitPrefix = (p: string) => p.replace(/^[ab]\//, "");
+
+const parseChunkHeader = (header: string) => {
+  const m = header.match(/^@@\s+-(\d+)(?:,(\d+))?\s+\+(\d+)(?:,(\d+))?\s+@@/);
+  if (!m) return null;
+  const oldStart = Number(m[1]);
+  const oldCount = m[2] ? Number(m[2]) : 1;
+  const newStart = Number(m[3]);
+  const newCount = m[4] ? Number(m[4]) : 1;
+  return { oldStart, oldCount, newStart, newCount };
+};
+
 const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 function injectSearchMarks(html: string, query: string): string {
@@ -214,21 +226,161 @@ const DiffLine = memo(function DiffLine({ change, lang, searchQuery }: { change:
   );
 });
 
-const Chunk = memo(function Chunk({ chunk, fk, lang, searchQuery }: { chunk: DiffChunk; fk: string; lang: string; searchQuery: string }) {
+const Chunk = memo(function Chunk({
+  chunk,
+  fk,
+  lang,
+  searchQuery,
+  hasOld,
+  hasNew,
+  oldLines,
+  newLines,
+  loadContext,
+}: {
+  chunk: DiffChunk;
+  fk: string;
+  lang: string;
+  searchQuery: string;
+  hasOld: boolean;
+  hasNew: boolean;
+  oldLines: string[] | null;
+  newLines: string[] | null;
+  loadContext: () => Promise<{ oldLines: string[]; newLines: string[] }>;
+}) {
+  const [expandedAbove, setExpandedAbove] = useState(0);
+  const [expandedBelow, setExpandedBelow] = useState(0);
+  const [contextLoading, setContextLoading] = useState(false);
+  const [hasMoreBelow, setHasMoreBelow] = useState(true);
+  const header = useMemo(() => parseChunkHeader(chunk.content), [chunk.content]);
+
+  const maxAbove = useMemo(() => {
+    if (!header) return 0;
+    if (hasOld && hasNew) return Math.max(0, Math.min(header.oldStart - 1, header.newStart - 1));
+    if (hasOld) return Math.max(0, header.oldStart - 1);
+    if (hasNew) return Math.max(0, header.newStart - 1);
+    return 0;
+  }, [header, hasOld, hasNew]);
+
+  const extraAbove = useMemo(() => {
+    if (!header || expandedAbove === 0 || (!oldLines && !newLines)) return [] as DiffChange[];
+    const oldStart = hasOld ? header.oldStart - expandedAbove : 0;
+    const newStart = hasNew ? header.newStart - expandedAbove : 0;
+    return Array.from({ length: expandedAbove }, (_, i) => {
+      const oldLn = hasOld ? oldStart + i : undefined;
+      const newLn = hasNew ? newStart + i : undefined;
+      const content = oldLn ? oldLines?.[oldLn - 1] ?? "" : newLn ? newLines?.[newLn - 1] ?? "" : "";
+      return { type: "normal" as const, content: ` ${content}`, ln1: oldLn, ln2: newLn };
+    });
+  }, [header, expandedAbove, hasOld, hasNew, oldLines, newLines]);
+
+  const extraBelow = useMemo(() => {
+    if (!header || expandedBelow === 0 || (!oldLines && !newLines)) return [] as DiffChange[];
+    const oldStart = hasOld ? header.oldStart + header.oldCount : 0;
+    const newStart = hasNew ? header.newStart + header.newCount : 0;
+    return Array.from({ length: expandedBelow }, (_, i) => {
+      const oldLn = hasOld ? oldStart + i : undefined;
+      const newLn = hasNew ? newStart + i : undefined;
+      const content = oldLn ? oldLines?.[oldLn - 1] ?? "" : newLn ? newLines?.[newLn - 1] ?? "" : "";
+      return { type: "normal" as const, content: ` ${content}`, ln1: oldLn, ln2: newLn };
+    });
+  }, [header, expandedBelow, hasOld, hasNew, oldLines, newLines]);
+
+  const revealAbove = async () => {
+    if (!header || contextLoading) return;
+    setContextLoading(true);
+    try {
+      await loadContext();
+      setExpandedAbove((prev) => Math.min(maxAbove, prev + 20));
+    } finally {
+      setContextLoading(false);
+    }
+  };
+
+  const revealBelow = async () => {
+    if (!header || contextLoading || !hasMoreBelow) return;
+    setContextLoading(true);
+    try {
+      const context = await loadContext();
+      const oldTotal = hasOld ? context.oldLines.length : Number.POSITIVE_INFINITY;
+      const newTotal = hasNew ? context.newLines.length : Number.POSITIVE_INFINITY;
+      const oldEnd = hasOld ? header.oldStart + header.oldCount - 1 + expandedBelow : 0;
+      const newEnd = hasNew ? header.newStart + header.newCount - 1 + expandedBelow : 0;
+      const oldAvail = hasOld ? Math.max(0, oldTotal - oldEnd) : Number.POSITIVE_INFINITY;
+      const newAvail = hasNew ? Math.max(0, newTotal - newEnd) : Number.POSITIVE_INFINITY;
+      const avail = Math.min(oldAvail, newAvail);
+      if (avail <= 0) {
+        setHasMoreBelow(false);
+        return;
+      }
+      const next = Math.min(20, avail);
+      setExpandedBelow((prev) => prev + next);
+      if (next === avail) setHasMoreBelow(false);
+    } finally {
+      setContextLoading(false);
+    }
+  };
+
   return (
     <div className="chunk">
+      {maxAbove > expandedAbove && (
+        <button className="chunk-expand" onClick={revealAbove} disabled={contextLoading}>
+          {contextLoading ? "Loading..." : `Show ${Math.min(20, maxAbove - expandedAbove)} lines above`}
+        </button>
+      )}
       <div className="chunk-hd">{chunk.content}</div>
+      {extraAbove.map((c, i) => <DiffLine key={`${fk}-xa-${i}`} change={c} lang={lang} searchQuery={searchQuery} />)}
       {chunk.changes.map((c, i) => <DiffLine key={`${fk}-${i}`} change={c} lang={lang} searchQuery={searchQuery} />)}
+      {extraBelow.map((c, i) => <DiffLine key={`${fk}-xb-${i}`} change={c} lang={lang} searchQuery={searchQuery} />)}
+      {header && hasMoreBelow && (
+        <button className="chunk-expand" onClick={revealBelow} disabled={contextLoading}>
+          {contextLoading ? "Loading..." : "Show 20 lines below"}
+        </button>
+      )}
     </div>
   );
 });
 
-const FileDiff = memo(function FileDiff({ file, searchQuery }: { file: DiffFile; searchQuery: string }) {
+const FileDiff = memo(function FileDiff({
+  file,
+  searchQuery,
+  repoPath,
+  baseRef,
+  compareRef,
+}: {
+  file: DiffFile;
+  searchQuery: string;
+  repoPath: string;
+  baseRef: string;
+  compareRef: string;
+}) {
   const [open, setOpen] = useState(true);
+  const [oldLines, setOldLines] = useState<string[] | null>(null);
+  const [newLines, setNewLines] = useState<string[] | null>(null);
   const label = fileLabel(file);
   const st = fileStatus(file);
   const lang = useMemo(() => detectLang(label), [label]);
   const isOpen = open || !!searchQuery;
+  const oldPath = file.from !== "/dev/null" ? stripGitPrefix(file.from) : "";
+  const newPath = file.to !== "/dev/null" ? stripGitPrefix(file.to) : "";
+  const hasOld = file.from !== "/dev/null";
+  const hasNew = file.to !== "/dev/null";
+
+  const loadContext = useCallback(async () => {
+    let nextOld = oldLines ?? [];
+    let nextNew = newLines ?? [];
+    if (!repoPath) return { oldLines: nextOld, newLines: nextNew };
+    if (hasOld && oldLines === null && oldPath) {
+      const result = await window.diffViewerAPI.getFileContent({ repoPath, ref: baseRef, filePath: oldPath });
+      nextOld = result.exists ? result.lines : [];
+      setOldLines(nextOld);
+    }
+    if (hasNew && newLines === null && newPath) {
+      const result = await window.diffViewerAPI.getFileContent({ repoPath, ref: compareRef, filePath: newPath });
+      nextNew = result.exists ? result.lines : [];
+      setNewLines(nextNew);
+    }
+    return { oldLines: nextOld, newLines: nextNew };
+  }, [repoPath, hasOld, oldLines, oldPath, baseRef, hasNew, newLines, newPath, compareRef]);
 
   return (
     <article className="file-card" data-file={label}>
@@ -247,7 +399,18 @@ const FileDiff = memo(function FileDiff({ file, searchQuery }: { file: DiffFile;
       {isOpen && (
         <div className="diff-body">
           {file.chunks.map((chunk, i) => (
-            <Chunk key={`${label}-c${i}`} chunk={chunk} fk={`${label}-c${i}`} lang={lang} searchQuery={searchQuery} />
+            <Chunk
+              key={`${label}-c${i}`}
+              chunk={chunk}
+              fk={`${label}-c${i}`}
+              lang={lang}
+              searchQuery={searchQuery}
+              hasOld={hasOld}
+              hasNew={hasNew}
+              oldLines={oldLines}
+              newLines={newLines}
+              loadContext={loadContext}
+            />
           ))}
         </div>
       )}
@@ -644,7 +807,16 @@ const DiffTabContent = memo(function DiffTabContent({
                   Refresh
                 </button>
               </div>
-              {files.map((f) => <FileDiff key={fileLabel(f)} file={f} searchQuery={searchQuery} />)}
+              {files.map((f) => (
+                <FileDiff
+                  key={fileLabel(f)}
+                  file={f}
+                  searchQuery={searchQuery}
+                  repoPath={repoPath}
+                  baseRef={targetBranch}
+                  compareRef={workingBranch}
+                />
+              ))}
             </>
           )}
         </div>
