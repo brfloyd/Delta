@@ -120,6 +120,9 @@ const splitPath = (label: string) => {
   return { dir: label.slice(0, i + 1), name: label.slice(i + 1) };
 };
 
+const changedLinesInChunk = (chunk: DiffChunk) =>
+  chunk.changes.reduce((count, change) => count + (change.type === "normal" ? 0 : 1), 0);
+
 const fileStatus = (file: DiffFile): { letter: string; cls: string } => {
   if (file.new) return { letter: "A", cls: "st-add" };
   if (file.deleted) return { letter: "D", cls: "st-del" };
@@ -333,7 +336,7 @@ const Chunk = memo(function Chunk({
   const showBelowControls = !!header && (hasMoreBelow || expandedBelow > 0);
 
   return (
-    <div className="chunk">
+    <div className="chunk" data-chunk={fk}>
       {showAboveControls && (
         <div className="chunk-expand-bar top">
           <button
@@ -491,6 +494,254 @@ const FileItem = memo(function FileItem({
         <span className="deletions">&minus;{file.deletions}</span>
       </div>
     </button>
+  );
+});
+
+const CodeGalaxy = memo(function CodeGalaxy({
+  files,
+  activeFile,
+  onSelectFile,
+  onSelectChunk,
+}: {
+  files: DiffFile[];
+  activeFile: string;
+  onSelectFile: (label: string) => void;
+  onSelectChunk: (label: string, chunkKey: string) => void;
+}) {
+  const width = 740;
+  const height = 430;
+  const centerX = width / 2;
+  const centerY = height / 2;
+  const [yaw, setYaw] = useState(0.65);
+  const [pitch, setPitch] = useState(-0.35);
+  const [zoom, setZoom] = useState(1);
+  const [dragging, setDragging] = useState(false);
+  const dragRef = useRef<{ pointerId: number; x: number; y: number; yaw: number; pitch: number } | null>(null);
+  const skipClickRef = useRef(false);
+
+  const basePlanets = useMemo(() => {
+    if (files.length === 0) return [];
+    const maxChanges = Math.max(...files.map((f) => f.additions + f.deletions), 1);
+    const baseOrbit = 165;
+    const verticalSpread = 85;
+
+    return files.map((file, fileIndex) => {
+      const label = fileLabel(file);
+      const { name } = splitPath(label);
+      const angle = (Math.PI * 2 * fileIndex) / files.length;
+      const orbit = baseOrbit + Math.sin(fileIndex * 0.9) * 18;
+      const x = Math.cos(angle) * orbit;
+      const z = Math.sin(angle) * orbit;
+      const y = Math.sin(fileIndex * 1.13) * verticalSpread;
+      const changes = file.additions + file.deletions;
+      const radius = 10 + (changes / maxChanges) * 16;
+      const moonLimit = Math.min(file.chunks.length, 14);
+      const moons = file.chunks.slice(0, moonLimit).map((chunk, chunkIndex) => {
+        const rawSize = changedLinesInChunk(chunk);
+        const size = Math.max(1, rawSize);
+        const moonAngle = (Math.PI * 2 * chunkIndex) / Math.max(1, moonLimit) + angle * 1.3;
+        const moonOrbit = radius + 14 + (chunkIndex % 4) * 8;
+        const moonRadius = 2.5 + Math.min(5, Math.log2(size + 1));
+        return {
+          key: `${label}-c${chunkIndex}`,
+          x: x + Math.cos(moonAngle) * moonOrbit,
+          y: y + Math.sin(moonAngle * 1.1) * (moonOrbit * 0.45),
+          z: z + Math.sin(moonAngle) * moonOrbit,
+          radius: moonRadius,
+          size,
+        };
+      });
+
+      return {
+        label,
+        name,
+        x,
+        y,
+        z,
+        radius,
+        additions: file.additions,
+        deletions: file.deletions,
+        moons,
+      };
+    });
+  }, [files]);
+
+  const scene = useMemo(() => {
+    const cosY = Math.cos(yaw);
+    const sinY = Math.sin(yaw);
+    const cosX = Math.cos(pitch);
+    const sinX = Math.sin(pitch);
+    const perspective = 560;
+
+    const projectPoint = (x: number, y: number, z: number) => {
+      const x1 = x * cosY - z * sinY;
+      const z1 = x * sinY + z * cosY;
+      const y1 = y * cosX - z1 * sinX;
+      const z2 = y * sinX + z1 * cosX;
+      const scale = perspective / Math.max(180, perspective - z2) * zoom;
+      return {
+        x: centerX + x1 * scale,
+        y: centerY + y1 * scale,
+        z: z2,
+        scale,
+      };
+    };
+
+    const projected = basePlanets.map((planet) => {
+      const pp = projectPoint(planet.x, planet.y, planet.z);
+      const moons = planet.moons
+        .map((moon) => {
+          const mp = projectPoint(moon.x, moon.y, moon.z);
+          return {
+            key: moon.key,
+            size: moon.size,
+            x: mp.x,
+            y: mp.y,
+            z: mp.z,
+            radius: moon.radius * Math.max(0.72, mp.scale),
+            opacity: Math.max(0.2, Math.min(1, 0.62 + mp.z / 500)),
+          };
+        })
+        .sort((a, b) => a.z - b.z);
+
+      return {
+        ...planet,
+        sx: pp.x,
+        sy: pp.y,
+        sz: pp.z,
+        radius: planet.radius * Math.max(0.72, pp.scale),
+        lineOpacity: Math.max(0.18, Math.min(0.5, 0.25 + pp.z / 900)),
+        labelOpacity: Math.max(0.2, Math.min(1, 0.52 + pp.z / 450)),
+        moons,
+      };
+    });
+
+    return projected.sort((a, b) => a.sz - b.sz);
+  }, [basePlanets, centerX, centerY, pitch, yaw, zoom]);
+
+  const resetView = () => {
+    setYaw(0.65);
+    setPitch(-0.35);
+    setZoom(1);
+  };
+
+  const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.button !== 0) return;
+    const target = e.target as Element | null;
+    if (target?.closest(".planet") || target?.closest(".moon")) {
+      return;
+    }
+    dragRef.current = { pointerId: e.pointerId, x: e.clientX, y: e.clientY, yaw, pitch };
+    skipClickRef.current = false;
+    setDragging(true);
+    e.currentTarget.setPointerCapture(e.pointerId);
+  };
+
+  const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    const drag = dragRef.current;
+    if (!drag || drag.pointerId !== e.pointerId) return;
+    const dx = e.clientX - drag.x;
+    const dy = e.clientY - drag.y;
+    if (Math.abs(dx) + Math.abs(dy) > 6) skipClickRef.current = true;
+    setYaw(drag.yaw + dx * 0.008);
+    setPitch(Math.max(-1.12, Math.min(1.12, drag.pitch + dy * 0.006)));
+  };
+
+  const onPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    const drag = dragRef.current;
+    if (!drag || drag.pointerId !== e.pointerId) return;
+    dragRef.current = null;
+    setDragging(false);
+    if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    }
+  };
+
+  const onClickCapture = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!skipClickRef.current) return;
+    e.preventDefault();
+    e.stopPropagation();
+    skipClickRef.current = false;
+  };
+
+  const onWheel = (e: React.WheelEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setZoom((v) => Math.max(0.6, Math.min(2.5, v - e.deltaY * 0.0013)));
+  };
+
+  return (
+    <section className="galaxy-card">
+      <div className="galaxy-head">
+        <h3>Code Galaxy 3D</h3>
+        <div className="galaxy-meta">
+          <p>Drag to spin, scroll to zoom, click planets/moons to jump.</p>
+          <button className="galaxy-reset" onClick={resetView}>Reset view</button>
+        </div>
+      </div>
+      <div
+        className={`galaxy-stage${dragging ? " dragging" : ""}`}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerUp}
+        onClickCapture={onClickCapture}
+        onWheel={onWheel}
+      >
+        <svg className="galaxy-map" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Code Galaxy visualization">
+          <defs>
+            <radialGradient id="galaxyCore" cx="50%" cy="50%" r="65%">
+              <stop offset="0%" stopColor="#58a6ff" stopOpacity="0.35" />
+              <stop offset="100%" stopColor="#58a6ff" stopOpacity="0" />
+            </radialGradient>
+          </defs>
+
+          <circle cx={centerX} cy={centerY} r={130 * zoom} fill="url(#galaxyCore)" />
+          <circle className="galaxy-core" cx={centerX} cy={centerY} r={10 * zoom} />
+
+          {scene.map((planet) => (
+            <g key={`orbit-${planet.label}`} className="galaxy-orbit">
+              <line x1={centerX} y1={centerY} x2={planet.sx} y2={planet.sy} opacity={planet.lineOpacity} />
+            </g>
+          ))}
+
+          {scene.map((planet) => (
+            <g key={planet.label} className={`planet-group${activeFile === planet.label ? " active" : ""}`}>
+              {planet.moons.map((moon) => (
+                <circle
+                  key={moon.key}
+                  className="moon"
+                  cx={moon.x}
+                  cy={moon.y}
+                  r={moon.radius}
+                  opacity={moon.opacity}
+                  onClick={() => onSelectChunk(planet.label, moon.key)}
+                >
+                  <title>{`${planet.name} - hunk (${moon.size} changed lines)`}</title>
+                </circle>
+              ))}
+              <circle
+                className="planet"
+                cx={planet.sx}
+                cy={planet.sy}
+                r={planet.radius}
+                onClick={() => onSelectFile(planet.label)}
+              >
+                <title>{`${planet.label}\n+${planet.additions} / -${planet.deletions}`}</title>
+              </circle>
+              <text
+                className="planet-label"
+                x={planet.sx}
+                y={planet.sy + planet.radius + 14}
+                textAnchor="middle"
+                opacity={planet.labelOpacity}
+              >
+                {planet.name.length > 20 ? `${planet.name.slice(0, 19)}...` : planet.name}
+              </text>
+            </g>
+          ))}
+        </svg>
+      </div>
+    </section>
   );
 });
 
@@ -722,6 +973,15 @@ const DiffTabContent = memo(function DiffTabContent({
     el?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
+  const scrollToChunk = (label: string, chunkKey: string) => {
+    const chunk = diffRef.current?.querySelector(`[data-chunk="${CSS.escape(chunkKey)}"]`);
+    if (chunk) {
+      chunk.scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
+    }
+    scrollTo(label);
+  };
+
   const closeSearch = () => {
     setSearchOpen(false);
     setSearchInput("");
@@ -853,6 +1113,12 @@ const DiffTabContent = memo(function DiffTabContent({
                   Refresh
                 </button>
               </div>
+              <CodeGalaxy
+                files={files}
+                activeFile={activeFile}
+                onSelectFile={scrollTo}
+                onSelectChunk={scrollToChunk}
+              />
               {files.map((f) => (
                 <FileDiff
                   key={fileLabel(f)}
