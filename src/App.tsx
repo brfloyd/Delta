@@ -320,21 +320,67 @@ const Chunk = memo(function Chunk({
     }
   };
 
+  const collapseAbove = () => {
+    setExpandedAbove((prev) => Math.max(0, prev - 20));
+  };
+
+  const collapseBelow = () => {
+    setExpandedBelow((prev) => Math.max(0, prev - 20));
+    setHasMoreBelow(true);
+  };
+
+  const showAboveControls = maxAbove > expandedAbove || expandedAbove > 0;
+  const showBelowControls = !!header && (hasMoreBelow || expandedBelow > 0);
+
   return (
     <div className="chunk">
-      {maxAbove > expandedAbove && (
-        <button className="chunk-expand" onClick={revealAbove} disabled={contextLoading}>
-          {contextLoading ? "Loading..." : `Show ${Math.min(20, maxAbove - expandedAbove)} lines above`}
-        </button>
+      {showAboveControls && (
+        <div className="chunk-expand-bar top">
+          <button
+            className="chunk-expand"
+            onClick={revealAbove}
+            disabled={contextLoading || maxAbove <= expandedAbove}
+            title="Show 20 lines above"
+            aria-label="Show 20 lines above"
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="18 15 12 9 6 15" /></svg>
+          </button>
+          <button
+            className="chunk-expand"
+            onClick={collapseAbove}
+            disabled={contextLoading || expandedAbove === 0}
+            title="Hide 20 lines above"
+            aria-label="Hide 20 lines above"
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9" /></svg>
+          </button>
+        </div>
       )}
       <div className="chunk-hd">{chunk.content}</div>
       {extraAbove.map((c, i) => <DiffLine key={`${fk}-xa-${i}`} change={c} lang={lang} searchQuery={searchQuery} />)}
       {chunk.changes.map((c, i) => <DiffLine key={`${fk}-${i}`} change={c} lang={lang} searchQuery={searchQuery} />)}
       {extraBelow.map((c, i) => <DiffLine key={`${fk}-xb-${i}`} change={c} lang={lang} searchQuery={searchQuery} />)}
-      {header && hasMoreBelow && (
-        <button className="chunk-expand" onClick={revealBelow} disabled={contextLoading}>
-          {contextLoading ? "Loading..." : "Show 20 lines below"}
-        </button>
+      {showBelowControls && (
+        <div className="chunk-expand-bar bottom">
+          <button
+            className="chunk-expand"
+            onClick={collapseBelow}
+            disabled={contextLoading || expandedBelow === 0}
+            title="Hide 20 lines below"
+            aria-label="Hide 20 lines below"
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="18 15 12 9 6 15" /></svg>
+          </button>
+          <button
+            className="chunk-expand"
+            onClick={revealBelow}
+            disabled={contextLoading || !hasMoreBelow}
+            title="Show 20 lines below"
+            aria-label="Show 20 lines below"
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9" /></svg>
+          </button>
+        </div>
       )}
     </div>
   );
