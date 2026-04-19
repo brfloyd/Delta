@@ -627,6 +627,10 @@ const CodeGalaxy = memo(function CodeGalaxy({
 
   const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     if (e.button !== 0) return;
+    const target = e.target as Element | null;
+    if (target?.closest(".planet") || target?.closest(".moon")) {
+      return;
+    }
     dragRef.current = { pointerId: e.pointerId, x: e.clientX, y: e.clientY, yaw, pitch };
     skipClickRef.current = false;
     setDragging(true);
